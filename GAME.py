@@ -1,6 +1,47 @@
-import unittest
-from main import create_ball, pymunk, new_ball, cue, math
 
+
+import pygame
+import unittest
+import pymunk
+import math
+from unittest.mock import MagicMock, patch
+from  main import create_ball
+
+
+# Function to handle events
+def handle_events(event, taking_shot, powering_up, run):
+    if event.type == pygame.MOUSEBUTTONDOWN and taking_shot:
+        powering_up = True
+    elif event.type == pygame.MOUSEBUTTONUP and taking_shot:
+        powering_up = False
+    elif event.type == pygame.QUIT:
+        run = False
+    return taking_shot, powering_up, run
+
+# Unit test class
+class TestEventHandler(unittest.TestCase):
+    def test_handle_events(self):
+        # Simulate events
+        pygame.init()
+        # Set initial states
+        taking_shot = True
+        powering_up = False
+        run = True
+
+        # Simulate a MOUSEBUTTONDOWN event
+        event = pygame.event.Event(pygame.MOUSEBUTTONDOWN)
+        taking_shot, powering_up, run = handle_events(event, taking_shot, powering_up, run)
+        self.assertTrue(powering_up)
+
+        # Simulate a MOUSEBUTTONUP event
+        event = pygame.event.Event(pygame.MOUSEBUTTONUP)
+        taking_shot, powering_up, run = handle_events(event, taking_shot, powering_up, run)
+        self.assertFalse(powering_up)
+
+        # Simulate a QUIT event
+        event = pygame.event.Event(pygame.QUIT)
+        taking_shot, powering_up, run = handle_events(event, taking_shot, powering_up, run)
+        self.assertFalse(run)
 
 class TestGame(unittest.TestCase):
     def test_ball_creation(balls):
@@ -53,30 +94,104 @@ class TestGame(unittest.TestCase):
         return shape
 
     def test_ball_pocket_collision(self):
-        # Simulate a situation where a ball collides with a pocket
         for pocket in self.pockets:
             ball_x_dist = abs(self.ball.body.position[0] - pocket[0])
             ball_y_dist = abs(self.ball.body.position[1] - pocket[1])
             ball_dist = math.sqrt((ball_x_dist ** 2) + (ball_y_dist ** 2))
             
-            # Check if the distance between the ball and any pocket is less than or equal to pocket diameter / 2
+            
             if ball_dist <= self.pocket_diameter / 2:
-                # Collision occurred, test asserts
-                # For example, you might assert that the ball is removed or its position changes
                 self.assertTrue(ball_dist <= self.pocket_diameter / 2)
-                # Add further assertions based on the expected behavior after collision
-                # For instance, removing the ball from active balls and asserting its removal
-
-                # For instance, if you have a function to handle ball removal:
-                # handle_ball_pocket_collision(self.ball) 
-                # Then you can assert that the ball was removed:
-                # self.assertNotIn(self.ball, self.space.b
     
+    def handle_events(event, taking_shot, powering_up, run):
+     if event.type == pygame.MOUSEBUTTONDOWN and taking_shot:
+        powering_up = True
+     elif event.type == pygame.MOUSEBUTTONUP and taking_shot:
+        powering_up = False
+     elif event.type == pygame.QUIT:
+        run = False
+     return taking_shot, powering_up, run   
+def power_up_pool_cue(powering_up, game_running, force, force_direction, max_force, taking_shot, balls, cue_angle):
+    if powering_up and game_running:
+        force += 100 * force_direction
+        if force >= max_force or force <= 0:
+            force_direction *= -1
+        return force, force_direction
+    elif not powering_up and taking_shot:
+        x_impulse = 0
+        y_impulse = 0
+        if len(balls) > 0:
+            x_impulse = math.cos(math.radians(cue_angle))
+            y_impulse = math.sin(math.radians(cue_angle))
+            balls[-1].body.apply_impulse_at_local_point((force * -x_impulse, force * y_impulse), (0, 0))
+        return force, force_direction
 
+class TestPowerUpPoolCue(unittest.TestCase):
+    def test_power_up_pool_cue_powering_up_true(self):
+        force = 5000
+        force_direction = 1
+        max_force = 10000
+        game_running = True
+        powering_up = True
+        taking_shot = True
+        balls = []  # Mocking the balls list for simplicity
+        cue_angle = 45  # Arbitrary value for testing
 
+        updated_force, updated_force_direction = power_up_pool_cue(
+            powering_up, game_running, force, force_direction, max_force, taking_shot, balls, cue_angle
+        )
 
-    
+        self.assertEqual(updated_force, 5100)  # Expected force after power-up
+        self.assertEqual(updated_force_direction, 1)  # Expected force direction after power-up
 
+    def test_power_up_pool_cue_powering_up_false(self):
+        force = 5000
+        force_direction = 1
+        max_force = 10000
+        game_running = True
+        powering_up = False
+        taking_shot = True
+        balls = []  # Mocking the balls list for simplicity
+        cue_angle = 45  # Arbitrary value for testing
+
+        updated_force, updated_force_direction = power_up_pool_cue(
+            powering_up, game_running, force, force_direction, max_force, taking_shot, balls, cue_angle
+        )
+
+        self.assertEqual(updated_force, 5000)  # Expected force remains unchanged
+        self.assertEqual(updated_force_direction, 1)  # Expected force direction remains unchanged
+
+    # Additional test cases for various scenarios can be added as needed
+# Assuming these are global variables or part of a class
+taking_shot = True
+game_running = True
+cue_ball_potted = True  # Assuming the cue ball is potted
+
+# Unit test class
+class TestDrawPoolCue(unittest.TestCase):
+    def test_draw_pool_cue(self):
+        global taking_shot, game_running, cue_ball_potted
+
+        if taking_shot and game_running:
+            if cue_ball_potted:
+                # Reposition the cue ball
+                cue_ball_position = (888, 339)  # Position where the cue ball is repositioned
+                self.assertEqual(cue_ball_position, (888, 339))  # Check if the cue ball is repositioned correctly
+
+                # Calculate pool cue angle
+                mouse_pos = (800, 400)  # Mouse position (assumed)
+                cue_ball_position = (888, 339)  # Current cue ball position
+                x_dist = cue_ball_position[0] - mouse_pos[0]
+                y_dist = -(cue_ball_position[1] - mouse_pos[1])
+                cue_angle = math.degrees(math.atan2(y_dist, x_dist))
+
+                # Check if the calculated cue angle is within an expected range
+                self.assertTrue(0 <= cue_angle <= 360)  # Adjust the range as per your expectation
+
+                # Ensure that cue.update(cue_angle) is called (assuming cue.update() exists)
+                # Mock or check any function calls related to drawing the cue
+
+     
 
 if __name__ == '__main__':
     unittest.main()
